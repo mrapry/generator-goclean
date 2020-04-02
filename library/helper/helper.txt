@@ -1,0 +1,214 @@
+package helper
+
+import (
+	"bytes"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
+	"fmt"
+	"math"
+	"math/rand"
+	"net/url"
+	"reflect"
+	"strconv"
+	"strings"
+	"time"
+
+	"github.com/agungdwiprasetyo/go-utils"
+)
+
+// RandomNumber function for random number
+func RandomNumber(length int) string {
+	var number = "0123456789"
+	rand.Seed(time.Now().UTC().UnixNano())
+
+	result := make([]byte, length)
+	for i := 0; i < length; i++ {
+		result[i] = number[rand.Intn(len(number))]
+	}
+	return string(result)
+}
+
+// GenerateHMAC to encrypt string
+func GenerateHMAC(str string) string {
+	key := []byte(salt)
+	h := hmac.New(sha256.New, key)
+	h.Write([]byte(str))
+	return hex.EncodeToString(h.Sum(nil))
+}
+
+func GenerateUnique(code string, random int) string {
+	now := time.Now()
+	return fmt.Sprintf(code+"%s%s", now.Format("060102"), RandomNumber(random))
+}
+
+// ParseFromQueryParam parse url query string to struct target, target must in pointer
+func ParseFromQueryParam(query url.Values, target interface{}) (err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("%v", r)
+		}
+	}()
+
+	mErr := utils.NewMultiError()
+
+	pValue := reflect.ValueOf(target)
+	if pValue.Kind() != reflect.Ptr {
+		return fmt.Errorf("%v can't addressable", pValue.Kind())
+	}
+	pValue = pValue.Elem()
+	pType := reflect.TypeOf(target).Elem()
+	for i := 0; i < pValue.NumField(); i++ {
+		field := pValue.Field(i)
+		typ := pType.Field(i)
+		if typ.Anonymous {
+			err = ParseFromQueryParam(query, field.Addr().Interface())
+		}
+
+		key := typ.Tag.Get("json")
+		key = strings.TrimSuffix(key, ",omitempty")
+		if key == "-" {
+			continue
+		}
+
+		var v string
+		if val := query[key]; len(val) > 0 && val[0] != "" {
+			v = val[0]
+		} else {
+			v = typ.Tag.Get("default")
+		}
+
+		switch field.Kind() {
+		case reflect.String:
+			if ok, _ := strconv.ParseBool(typ.Tag.Get("lower")); ok {
+				v = strings.ToLower(v)
+			}
+			field.SetString(v)
+		case reflect.Int32, reflect.Int, reflect.Int64:
+			vInt, err := strconv.Atoi(v)
+			if v != "" && err != nil {
+				mErr.Append(key, fmt.Errorf("Cannot parse '%s' (%T) to type number", v, v))
+			}
+			field.SetInt(int64(vInt))
+		case reflect.Bool:
+			vBool, err := strconv.ParseBool(v)
+			if err != nil {
+				mErr.Append(key, fmt.Errorf("Cannot parse '%s' (%T) to type boolean", v, v))
+			}
+			field.SetBool(vBool)
+		}
+	}
+
+	if mErr.HasError() {
+		return mErr
+	}
+
+	return
+}
+
+// GetKeyFromSQLErrorMessage func
+func GetKeyFromSQLErrorMessage(prefix, message string) string {
+	res := "key"
+
+	idx := strings.Index(message, prefix)
+	if idx != -1 {
+		var key []byte
+		for _, r := range message[idx:] {
+			if r == 39 { // char '
+				break
+			}
+			key = append(key, byte(r))
+		}
+		res = strings.TrimPrefix(string(key), prefix)
+	}
+	return res
+}
+
+// Compare two struct and set to zero destination field from source
+func Compare(destination, source interface{}) {
+	defer func() {
+		recover()
+	}()
+
+	sVal, dVal := reflect.ValueOf(source), reflect.ValueOf(destination)
+	if dVal.Kind() != reflect.Ptr {
+		return
+	}
+	dVal = dVal.Elem()
+	if sVal.Kind() == reflect.Ptr {
+		sVal = sVal.Elem()
+	}
+	if sVal.Kind() != reflect.Struct || dVal.Kind() != reflect.Struct {
+		return
+	}
+
+	for i := 0; i < sVal.NumField(); i++ {
+		sField, dField := sVal.Field(i), dVal.Field(i)
+		if !(dField.Kind() == sField.Kind() && dField.Interface() == sField.Interface()) {
+			dField.Set(sField)
+		}
+	}
+}
+
+func StringToTime(param string) time.Time {
+	layoutFormat := "2006-01-02"
+	t, err := time.Parse(layoutFormat, param)
+	if err != nil {
+		fmt.Println(err.Error())
+	}
+	return t
+}
+
+func ToTimeRFC3339Nano(param string) time.Time {
+	layout := "2006-01-02T15:04:05.999999999"
+	t, err := time.Parse(layout, param)
+	if err != nil {
+		fmt.Println(err.Error())
+	}
+	return t
+}
+
+func RoundUp(input float64, places int) (newVal float64) {
+	var round float64
+	pow := math.Pow(10, float64(places))
+	digit := pow * input
+	round = math.Ceil(digit)
+	newVal = round / pow
+	return
+}
+
+func StatusTransactionToCode(status string) string {
+	var code string
+	switch strings.ToLower(status) {
+	case "paid":
+		code = "501"
+		break
+	case "waiting for payment":
+		code = "502"
+		break
+	case "open":
+		code = "503"
+		break
+	case "accept":
+		code = "504"
+		break
+	case "declined":
+		code = "505"
+		break
+	case "closed":
+		code = "506"
+		break
+	default:
+		code = ""
+		break
+	}
+
+	return code
+}
+
+func Prettyprint(b []byte) {
+	var out bytes.Buffer
+	json.Indent(&out, b, "", "  ")
+	fmt.Printf("%s", out.Bytes())
+}

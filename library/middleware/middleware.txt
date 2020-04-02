@@ -1,0 +1,10 @@
+package middleware
+
+// Middleware model
+type Middleware struct {
+}
+
+// NewMiddleware create new middleware instance
+func NewMiddleware() *Middleware {
+	return &Middleware{}
+}

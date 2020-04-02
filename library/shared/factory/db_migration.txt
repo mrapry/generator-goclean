@@ -1,0 +1,19 @@
+package factory
+
+/*
+Import for all domain to will be generate table otomatic in gorm go
+*/
+import (
+	"pos_service/config"
+
+	"github.com/jinzhu/gorm"
+)
+
+func InitDBMigration(db *gorm.DB) {
+	if !config.GlobalEnv.AutoMigrate {
+		return
+	}
+
+	//used
+	//db.AutoMigrate(domain_initial.name_of_domain{})
+}
