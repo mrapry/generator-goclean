@@ -11,7 +11,7 @@ import (
 
 const connPattern = "host=? port=? user=? dbname=? password=? sslmode=disable"
 
-// InitSQLServerDB func
+// InitPostgresDB function
 func InitPostgresDB() (read *gorm.DB, write *gorm.DB, err error) {
 	read, err = gorm.Open("postgres",
 		"host="+os.Getenv("DB_READ_HOST")+

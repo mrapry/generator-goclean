@@ -1,0 +1,72 @@
+package config
+
+import (
+	"fmt"
+	"os"
+	"$VAR1/config/db"
+	"strconv"
+
+	"github.com/jinzhu/gorm"
+)
+
+type (
+	// Config app
+	Config struct {
+		DBRead, DBWrite *gorm.DB
+	}
+
+	// Env for environment
+	Env struct {
+		AutoMigrate                bool
+		DebugMode                  bool
+		HTTPPort                   string
+		Username, Password, prefix string
+	}
+)
+
+// GlobalEnv global environment
+var GlobalEnv Env
+
+// Init app configuration
+func Init() *Config {
+	var conf Config
+	var err error
+	var ok bool
+
+	GlobalEnv.AutoMigrate, _ = strconv.ParseBool(os.Getenv("AUTO_MIGRATE"))
+	GlobalEnv.DebugMode, _ = strconv.ParseBool(os.Getenv("DEBUG_MODE"))
+
+	conf.DBRead, conf.DBWrite, err = db.InitPostgresDB()
+	if err != nil {
+		panic(err.Error())
+	}
+
+	GlobalEnv.HTTPPort, ok = os.LookupEnv("HTTP_PORT")
+	if !ok {
+		panic("missing HTTP_PORT environment")
+	}
+
+	GlobalEnv.Username, ok = os.LookupEnv("USERNAME")
+	if !ok {
+		panic("missing USERNAME environment")
+	}
+	GlobalEnv.Password, ok = os.LookupEnv("PASSWORD")
+	if !ok {
+		panic("missing PASSWORD environment")
+	}
+
+	// PREFIX TABLE ENV
+	GlobalEnv.prefix, ok = os.LookupEnv("PREFIX_TABLE")
+	if !ok {
+		panic("missing PREFIX_TABLE environment")
+	}
+
+	return &conf
+}
+
+// Exit release all connection
+func (c *Config) Exit() {
+	c.DBRead.Close()
+	c.DBWrite.Close()
+	fmt.Println("Success close all connection")
+}

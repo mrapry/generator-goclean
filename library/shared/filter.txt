@@ -1,0 +1,59 @@
+package shared
+
+import (
+	"fmt"
+	"strings"
+	"time"
+)
+
+// Filter data
+type Filter struct {
+	Limit   int    `json:"limit" default:"10"`
+	Page    int    `json:"page" default:"1"`
+	Offset  int    `json:"-"`
+	Search  string `json:"search,omitempty"`
+	OrderBy string `json:"order_by,omitempty" default:"created_at"`
+	Sort    string `json:"sort,omitempty" default:"desc" lower:"true"`
+	ShowAll bool   `json:"show_all" default:"false"`
+	Parent  string `json:"parent,omitempty"`
+	UserID  string `json:"user_id,omitempty"`
+	All     bool   `json:"all" default:"false"`
+}
+
+// CalculateOffset method
+func (f *Filter) CalculateOffset() {
+	f.Offset = (f.Page - 1) * f.Limit
+}
+
+func (f *Filter) SearchCondition(searchFields []string) string {
+	var likes []string
+	for _, key := range searchFields {
+		likes = append(likes, fmt.Sprintf(`CAST(lower(%s) as text) LIKE '%%%s%%'`, key, strings.ToLower(f.Search)))
+	}
+
+	return strings.Join(likes, " OR ")
+}
+
+func (f *Filter) LikeCondition(searchFields []string, value string) string {
+	var likes []string
+	for _, key := range searchFields {
+		likes = append(likes, fmt.Sprintf(`CAST(lower(%s) as text) LIKE '%%%s%%'`, key, strings.ToLower(strings.TrimSpace(value))))
+	}
+
+	return strings.Join(likes, " OR ")
+}
+
+func (f *Filter) DateCondition(column, date string) string {
+	layoutFormat := "2006-01-02"
+	initial, err := time.Parse(layoutFormat, date)
+	if err != nil {
+		fmt.Println(err.Error())
+	}
+
+	start := initial.Format("2006-01-02 15:04:05")
+	end := initial.Add(time.Hour*23 + time.Minute*59 + time.Second*59).Format("2006-01-02 15:04:05")
+	getDate := fmt.Sprintf("%s BETWEEN '%s' AND '%s'", column, start, end)
+
+	return getDate
+}
+å
