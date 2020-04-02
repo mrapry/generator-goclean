@@ -1,0 +1,43 @@
+package db
+
+import (
+	"fmt"
+	"os"
+	"strconv"
+
+	"github.com/jinzhu/gorm"
+	_ "github.com/jinzhu/gorm/dialects/postgres"
+)
+
+const connPattern = "host=? port=? user=? dbname=? password=? sslmode=disable"
+
+// InitSQLServerDB func
+func InitPostgresDB() (read *gorm.DB, write *gorm.DB, err error) {
+	read, err = gorm.Open("postgres",
+		"host="+os.Getenv("DB_READ_HOST")+
+			" port="+os.Getenv("DB_READ_PORT")+
+			" user="+os.Getenv("DB_READ_USER")+
+			" dbname="+os.Getenv("DB_READ_DBNAME")+
+			" password="+os.Getenv("DB_READ_PASS")+
+			" sslmode=disable")
+	if err != nil {
+		return nil, nil, err
+	}
+
+	write, err = gorm.Open("postgres",
+		"host="+os.Getenv("DB_WRITE_HOST")+
+			" port="+os.Getenv("DB_WRITE_PORT")+
+			" user="+os.Getenv("DB_WRITE_USER")+
+			" dbname="+os.Getenv("DB_WRITE_DBNAME")+
+			" password="+os.Getenv("DB_WRITE_PASS")+
+			" sslmode=disable")
+	if err != nil {
+		return nil, nil, err
+	}
+
+	isDebugMode, _ := strconv.ParseBool(os.Getenv("DEBUG_MODE"))
+	read.LogMode(isDebugMode)
+	write.LogMode(isDebugMode)
+	fmt.Println("Database is connected")
+	return
+}
